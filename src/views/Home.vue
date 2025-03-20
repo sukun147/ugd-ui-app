@@ -42,7 +42,6 @@
           >
             <div class="session-item">
               <span class="session-title">{{ session.title }}</span>
-              <span class="session-time">{{ formatTime(session.createTime, 'short') }}</span>
             </div>
           </el-menu-item>
         </el-menu>
@@ -160,6 +159,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { getUserSessions } from '@/api/user'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -187,6 +187,13 @@ const passwordForm = reactive({
   newPassword: '',
   confirmPassword: ''
 })
+
+// 会话列表相关变量
+const sessionList = ref([])
+const sessionTotal = ref(0)
+const pageNo = ref(1)
+const pageSize = ref(10)
+const isCollapse = ref(false)
 
 // 表单验证规则
 const profileRules = {
@@ -243,14 +250,14 @@ const formatTime = (time) => {
   }
 }
 
-// 初始化时获取用户信息
 onMounted(async () => {
   try {
     if (userStore.isLoggedIn) {
       await fetchUserInfo()
+      await fetchSessionList()
     }
   } catch (error) {
-    console.error('获取用户信息失败', error)
+    console.error('初始化失败', error)
   }
 })
 
@@ -401,6 +408,33 @@ const submitPassword = () => {
     }
   })
 }
+
+// 在 script setup 中添加以下方法
+const fetchSessionList = async () => {
+  try {
+    const response = await getUserSessions({
+      pageNo: pageNo.value,
+      pageSize: pageSize.value
+    })
+    sessionList.value = response.data.list
+    sessionTotal.value = response.data.total
+  } catch (error) {
+    ElMessage.error('获取会话列表失败')
+    console.error('获取会话列表失败:', error)
+  }
+}
+
+// 处理页码变化
+const handlePageChange = (page) => {
+  pageNo.value = page
+  fetchSessionList()
+}
+
+// 选择会话
+const selectSession = (session) => {
+  // TODO: 处理会话选择逻辑
+  console.log('选中会话:', session)
+}
 </script>
 
 <style>
@@ -464,22 +498,24 @@ const submitPassword = () => {
       .session-menu {
         border-right: none;
 
-        .session-item {
-          display: flex;
-          flex-direction: column;
-          overflow: hidden;
+        .session-menu {
+          border-right: none;
 
-          .session-title {
-            font-size: 14px;
-            white-space: nowrap;
+          .session-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
             overflow: hidden;
-            text-overflow: ellipsis;
-          }
 
-          .session-time {
-            font-size: 12px;
-            color: #999;
-            margin-top: 4px;
+            .session-title {
+              font-size: 14px;
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              color: #333;
+            }
           }
         }
       }
