@@ -36,3 +36,40 @@ export function logout() {
         method: 'get'
     })
 }
+
+/**
+ * 获取当前用户信息
+ * @returns {Promise}
+ */
+export function getUserInfo() {
+    return request({
+        url: '/app-api/tcmc/client-user/get',
+        method: 'get'
+    })
+}
+
+/**
+ * 更新用户个人信息
+ * @param {Object} data
+ * @returns {Promise}
+ */
+export function updateUserInfo(data) {
+    return request({
+        url: '/app-api/tcmc/client-user/update',
+        method: 'put',
+        data
+    })
+}
+
+/**
+ * 修改用户密码
+ * @param {Object} data
+ * @returns {Promise}
+ */
+export function updatePassword(data) {
+    return request({
+        url: '/app-api/tcmc/client-user/updatePassword',
+        method: 'post',
+        data
+    })
+}
