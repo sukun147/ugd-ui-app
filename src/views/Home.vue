@@ -57,13 +57,19 @@ const handleCommand = (command) => {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
       type: 'warning'
-    }).then(() => {
-      userStore.logout()
-      ElMessage({
-        type: 'success',
-        message: '退出登录成功'
-      })
-      router.push('/login')
+    }).then(async () => {
+      try {
+        await userStore.logout()
+        ElMessage({
+          type: 'success',
+          message: '退出登录成功'
+        })
+      } catch (error) {
+        ElMessage({
+          type: 'error',
+          message: error.message || '退出登录失败'
+        })
+      }
     }).catch(() => {})
   } else if (command === 'profile') {
     router.push('/profile')

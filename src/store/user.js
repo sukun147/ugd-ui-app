@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { login, register } from '@/api/user'
+import { login, register, logout } from '@/api/user'
 import router from '@/router'
 
 export const useUserStore = defineStore('user', {
@@ -56,21 +56,31 @@ export const useUserStore = defineStore('user', {
         },
 
         // 退出登录
-        logout() {
-            this.userId = null
-            this.username = ''
-            this.accessToken = ''
-            this.refreshToken = ''
-            this.expiresTime = null
+        async logout() {
+            try {
+                // 调用登出接口
+                await logout()
 
-            // 清除 localStorage
-            localStorage.removeItem('userId')
-            localStorage.removeItem('username')
-            localStorage.removeItem('accessToken')
-            localStorage.removeItem('refreshToken')
+                // 清除状态
+                this.userId = null
+                this.username = ''
+                this.accessToken = ''
+                this.refreshToken = ''
+                this.expiresTime = null
 
-            // 跳转到登录页
-            router.push('/login')
+                // 清除 localStorage
+                localStorage.removeItem('userId')
+                localStorage.removeItem('username')
+                localStorage.removeItem('accessToken')
+                localStorage.removeItem('refreshToken')
+
+                // 跳转到登录页
+                router.push('/login')
+
+                return true
+            } catch (error) {
+                return Promise.reject(error)
+            }
         }
     }
 })

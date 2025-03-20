@@ -26,4 +26,13 @@ export function register(data) {
     })
 }
 
-// 可以在这里添加其他用户相关的 API
+/**
+ * 用户登出
+ * @returns {Promise}
+ */
+export function logout() {
+    return request({
+        url: '/app-api/tcmc/client-user/logout',
+        method: 'get'
+    })
+}
