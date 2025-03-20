@@ -73,3 +73,28 @@ export function updatePassword(data) {
         data
     })
 }
+
+/**
+ * 获取用户会话列表
+ * @param {Object} params
+ * @returns {Promise}
+ */
+export function getUserSessions(params) {
+    return request({
+        url: '/app-api/tcmc/client-user/session/page',
+        method: 'get',
+        params
+    })
+}
+
+/**
+ * 获取会话详情
+ * @param {Number} id 会话ID
+ * @returns {Promise}
+ */
+export function getSessionDetail(id) {
+    return request({
+        url: `/app-api/tcmc/client-user/session/get/${id}`,
+        method: 'get'
+    })
+}

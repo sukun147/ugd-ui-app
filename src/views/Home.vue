@@ -20,6 +20,44 @@
     </el-header>
 
     <el-container class="main-container">
+      <!-- 添加左侧会话列表侧边栏 -->
+      <el-aside width="250px" class="sidebar" :class="{ 'is-collapsed': isCollapse }">
+        <div class="session-header">
+          <span>历史会话</span>
+          <el-button type="text" @click="isCollapse = !isCollapse">
+            <i :class="isCollapse ? 'el-icon-d-arrow-right' : 'el-icon-d-arrow-left'"></i>
+          </el-button>
+        </div>
+        <el-menu
+            :collapse="isCollapse"
+            :collapse-transition="false"
+            class="session-menu"
+        >
+          <el-empty v-if="sessionList.length === 0" description="暂无会话记录"></el-empty>
+          <el-menu-item
+              v-for="session in sessionList"
+              :key="session.id"
+              :index="session.id.toString()"
+              @click="selectSession(session)"
+          >
+            <div class="session-item">
+              <span class="session-title">{{ session.title }}</span>
+              <span class="session-time">{{ formatTime(session.createTime, 'short') }}</span>
+            </div>
+          </el-menu-item>
+        </el-menu>
+        <div class="pagination-container" v-if="sessionList.length > 0">
+          <el-pagination
+              small
+              layout="prev, pager, next"
+              :total="sessionTotal"
+              :page-size="pageSize"
+              :current-page="pageNo"
+              @current-change="handlePageChange"
+          />
+        </div>
+      </el-aside>
+
       <el-main class="main">
         <div class="consultation-center">
           <el-card class="consultation-card">
@@ -403,6 +441,56 @@ const submitPassword = () => {
   .main-container {
     flex: 1;
     overflow: hidden;
+
+    /* 侧边栏样式 */
+    .sidebar {
+      background-color: #fff;
+      border-right: 1px solid #e6e6e6;
+      transition: width 0.3s;
+
+      &.is-collapsed {
+        width: 64px !important;
+      }
+
+      .session-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px;
+        border-bottom: 1px solid #e6e6e6;
+        font-weight: bold;
+      }
+
+      .session-menu {
+        border-right: none;
+
+        .session-item {
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+
+          .session-title {
+            font-size: 14px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+
+          .session-time {
+            font-size: 12px;
+            color: #999;
+            margin-top: 4px;
+          }
+        }
+      }
+
+      .pagination-container {
+        padding: 10px 0;
+        display: flex;
+        justify-content: center;
+        border-top: 1px solid #e6e6e6;
+      }
+    }
 
     .main {
       padding: 20px;
