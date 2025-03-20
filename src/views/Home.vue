@@ -125,26 +125,14 @@ const handleCommand = (command) => {
       .consultation-card {
         border-radius: 8px;
         background: #fff;
+        width: 1000px;
         border: 1px solid #ebeef5;
-        width: 90%;
         margin: 20px auto;
         box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
-        
-        .el-card__body {
-          padding: 0;
-        }
 
         .consultation-input {
           width: 100%;
-          
-          .el-textarea {
-            .el-textarea__inner {
-              border: none;
-              background: none;
-              box-shadow: none;
-              padding: 0;
-            }
-          }
+
         }
       }
     }
