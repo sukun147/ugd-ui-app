@@ -286,13 +286,11 @@
 <script setup>
 import {ref, reactive, onMounted, nextTick} from 'vue'
 import {ChatDotRound, Edit, Loading, MoreFilled, Plus} from '@element-plus/icons-vue'
-import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getUserSessions, getSessionDetail, updateSession } from '@/api/user'
+import { getUserSessions, getSessionDetail, getUserSession, updateSession } from '@/api/user'
 import { createQA } from '@/api/qa'
 
-const router = useRouter()
 const userStore = useUserStore()
 
 const username = ref(userStore.username || '')
@@ -361,7 +359,7 @@ const passwordRules = {
   confirmPassword: [
     { required: true, message: '请再次输入新密码', trigger: 'blur' },
     {
-      validator: (rule, value, callback) => {
+      validator: (value, callback) => {
         if (value !== passwordForm.newPassword) {
           callback(new Error('两次输入的密码不一致'))
         } else {
@@ -619,20 +617,7 @@ const handleNewChat = () => {
  * @param {Object} newSession - 新会话对象
  */
 const updateSessionList = (newSession) => {
-  // 检查会话是否已存在
-  const existingIndex = sessionList.value.findIndex(session => session.id === newSession.id)
-
-  if (existingIndex !== -1) {
-    // 如果会话已存在，更新它
-    sessionList.value[existingIndex] = {
-      ...sessionList.value[existingIndex],
-      updateTime: newSession.updateTime,
-      title: newSession.title
-    }
-  } else {
-    // 如果是新会话，添加到列表开头
     sessionList.value.unshift(newSession)
-  }
 }
 
 /**
@@ -657,22 +642,16 @@ const handleSendQuestion = async () => {
       // 如果返回的数据中包含会话信息，则切换到该会话
       if (newQA.sessionId) {
         // 构造会话对象
-        const newSession = {
-          id: newQA.sessionId,
-          title: newQA.question, // 使用问题作为会话标题
-        }
+        const response = (await getUserSession(newQA.sessionId))
 
         // 更新会话列表
-        updateSessionList(newSession)
+        updateSessionList(response.data)
 
         // 切换到新会话
-        await selectSession(newSession)
+        await selectSession(response.data)
 
         // 清空首页输入框
         consultationQuery.value = ''
-
-        // 将问答添加到列表
-        qaList.value.push(newQA)
 
         // 滚动到最新消息
         await nextTick(() => {
@@ -835,16 +814,6 @@ const startEditTitle = (session, event) => {
   flex-shrink: 0;
 }
 
-.header-left {
-  display: flex;
-  align-items: center;
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-}
-
 .user-info {
   display: flex;
   align-items: center;
@@ -857,18 +826,6 @@ const startEditTitle = (session, event) => {
   &:hover {
     background-color: #f5f7fa;
   }
-}
-
-.user-avatar {
-  background-color: #409eff;
-  color: #fff;
-  font-weight: bold;
-}
-
-.username {
-  margin: 0 8px;
-  font-size: 14px;
-  color: #333;
 }
 
 /* 主容器样式 */
@@ -886,10 +843,6 @@ const startEditTitle = (session, event) => {
   transition: width 0.3s;
   display: flex;
   flex-direction: column;
-
-  &.is-collapsed {
-    width: 64px !important;
-  }
 
   .session-header {
     display: flex;
@@ -923,10 +876,6 @@ const startEditTitle = (session, event) => {
         background-color: #f0f2f5;
       }
 
-      .el-icon {
-        font-size: 18px;
-        transition: transform 0.3s;
-      }
     }
   }
 
@@ -988,9 +937,6 @@ const startEditTitle = (session, event) => {
     color: #409eff;
   }
 
-  .el-icon {
-    vertical-align: middle;
-  }
 }
 
 /* 在会话项hover时显示更多按钮 */
@@ -1026,24 +972,6 @@ const startEditTitle = (session, event) => {
     max-width: calc(100% - 40px);
     margin: 0 auto;
 
-    .el-card__body {
-      padding: 24px;
-    }
-  }
-
-  .consultation-input {
-    .el-textarea__inner {
-      resize: none;
-      border-radius: 4px;
-      padding: 12px;
-      font-size: 14px;
-      line-height: 1.6;
-      min-height: 150px !important;
-
-      &:focus {
-        box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.1);
-      }
-    }
   }
 
   .consultation-footer {
@@ -1061,12 +989,6 @@ const startEditTitle = (session, event) => {
       border-radius: 4px;
     }
 
-    .el-button {
-      min-width: 96px;
-      height: 40px;
-      font-size: 14px;
-      font-weight: 500;
-    }
   }
 }
 
@@ -1099,59 +1021,6 @@ const startEditTitle = (session, event) => {
     white-space: nowrap;
   }
 
-  .el-button {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 8px 16px;
-    font-weight: 500;
-
-    .el-icon {
-      font-size: 16px;
-    }
-
-    &:hover {
-      background-color: #ecf5ff;
-    }
-  }
-}
-
-/* 主要按钮样式 */
-.el-button--primary {
-  &:not(.is-link) {
-    min-width: 88px;
-    font-weight: 500;
-    padding: 8px 20px;
-    height: 36px;
-    box-shadow: 0 2px 4px rgba(64, 158, 255, 0.1);
-
-    &:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 8px rgba(64, 158, 255, 0.2);
-    }
-
-    &:active {
-      transform: translateY(0);
-    }
-  }
-
-  &.is-link {
-    font-weight: 500;
-
-    &:hover {
-      background-color: #ecf5ff;
-      color: #409eff;
-    }
-  }
-
-  &.is-loading {
-    background-color: #409eff;
-    opacity: 0.9;
-
-    &::before {
-      background-color: rgba(255, 255, 255, 0.35);
-    }
-  }
 }
 
 /* 内容区域样式 */
@@ -1165,8 +1034,7 @@ const startEditTitle = (session, event) => {
 .qa-list {
   height: 100%;
   overflow-y: auto;
-  padding: 24px;
-  padding-bottom: 16px;
+  padding: 24px 24px 16px;
 
   &::-webkit-scrollbar {
     width: 6px;
@@ -1266,18 +1134,6 @@ const startEditTitle = (session, event) => {
   max-width: 800px;
   margin: 0 auto;
 
-  .el-textarea__inner {
-    resize: none;
-    border-radius: 4px;
-    padding: 12px;
-    font-size: 14px;
-    line-height: 1.6;
-    min-height: 100px !important;
-
-    &:focus {
-      box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.1);
-    }
-  }
 }
 
 .qa-input-footer {
@@ -1294,106 +1150,6 @@ const startEditTitle = (session, event) => {
     padding: 4px 12px;
     border-radius: 4px;
   }
-
-  .el-button {
-    min-width: 96px;
-    height: 40px;
-    font-size: 14px;
-    font-weight: 500;
-  }
-}
-
-/* 下拉菜单样式优化 */
-.el-dropdown-menu {
-  padding: 4px 0;
-
-  .el-dropdown-menu__item {
-    display: flex;
-    align-items: center;
-    padding: 8px 16px;
-    font-size: 14px;
-
-    .el-icon {
-      margin-right: 8px;
-      font-size: 16px;
-    }
-
-    &:hover {
-      background-color: #ecf5ff;
-      color: #409eff;
-    }
-
-    &.danger {
-      color: #f56c6c;
-
-      &:hover {
-        background-color: #fef0f0;
-        color: #f56c6c;
-      }
-    }
-  }
-}
-
-/* 对话框样式 */
-.el-dialog {
-  border-radius: 8px;
-
-  .el-dialog__header {
-    margin: 0;
-    padding: 20px 24px;
-    border-bottom: 1px solid #e6e6e6;
-
-    .el-dialog__title {
-      font-size: 16px;
-      font-weight: 500;
-    }
-  }
-
-  .el-dialog__body {
-    padding: 24px;
-  }
-
-  .dialog-footer {
-    display: flex;
-    justify-content: flex-end;
-    margin-top: 24px;
-
-    .el-button {
-      min-width: 88px;
-      padding: 8px 20px;
-      height: 36px;
-      font-weight: 500;
-
-      & + .el-button {
-        margin-left: 16px;
-      }
-
-      &--default {
-        border-color: #dcdfe6;
-
-        &:hover {
-          border-color: #c0c4cc;
-          background-color: #f5f7fa;
-        }
-      }
-    }
-  }
-}
-
-/* 菜单项状态样式 */
-.el-menu-item {
-  &.is-active {
-    background-color: #ecf5ff;
-
-    .session-title {
-      color: #409eff;
-      font-weight: 500;
-    }
-  }
-
-  &:hover {
-    background-color: #f5f7fa;
-  }
 }
 
 /* 加载和空状态样式 */
@@ -1406,10 +1162,6 @@ const startEditTitle = (session, event) => {
   color: #909399;
   font-size: 14px;
 
-  .el-icon {
-    margin-right: 8px;
-    font-size: 20px;
-  }
 }
 
 /* 全局滚动条样式 */
@@ -1445,16 +1197,9 @@ const startEditTitle = (session, event) => {
     padding: 12px 16px;
   }
 
-  .qa-input-wrapper .el-textarea__inner {
-    min-height: 80px !important;
-  }
-
   .message-item .content {
     max-width: 85%;
   }
 
-  .user-info .username {
-    display: none;
-  }
 }
 </style>

@@ -88,6 +88,19 @@ export function getUserSessions(params) {
 }
 
 /**
+ * 获取用户会话
+ * @param {Number} sessionId - 会话编号
+ * @returns {Promise}
+ */
+export function getUserSession(sessionId) {
+    return request({
+        url: '/app-api/tcmc/client-user/session/get',
+        method: 'get',
+        params: { sessionId }
+    })
+}
+
+/**
  * 获取会话详情
  * @param {Number} sessionId - 会话编号
  * @returns {Promise}
