@@ -99,3 +99,18 @@ export function getSessionDetail(sessionId) {
         params: { sessionId }
     })
 }
+
+/**
+ * 更新会话标题
+ * @param {Object} data
+ * @param {number} data.id - 会话编号
+ * @param {string} data.title - 标题
+ * @returns {Promise}
+ */
+export function updateSession(data) {
+    return request({
+        url: '/app-api/tcmc/client-user/session/update',
+        method: 'post',
+        data
+    })
+}

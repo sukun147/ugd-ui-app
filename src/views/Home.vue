@@ -20,46 +20,93 @@
     </el-header>
 
     <el-container class="main-container">
-      <!-- 添加左侧会话列表侧边栏 -->
-      <el-aside width="250px" class="sidebar" :class="{ 'is-collapsed': isCollapse }">
+      <!-- 侧边栏 -->
+      <el-aside :width="isCollapse ? '64px' : '260px'" class="sidebar">
         <div class="session-header">
-          <span>历史会话</span>
-          <el-button type="text" @click="isCollapse = !isCollapse">
-            <i :class="isCollapse ? 'el-icon-d-arrow-right' : 'el-icon-d-arrow-left'"></i>
+          <span v-show="!isCollapse">历史会话</span>
+          <el-button
+              type="primary"
+              link
+              class="collapse-btn"
+              @click="isCollapse = !isCollapse"
+          >
+            <el-icon>
+              <component :is="isCollapse ? 'Expand' : 'Fold'" />
+            </el-icon>
           </el-button>
         </div>
-        <!-- 滚动容器 -->
-        <div class="session-container" ref="sessionContainerRef">
+        <div class="session-container">
           <el-menu
-              ref="sessionMenuRef"
-              :collapse="isCollapse"
-              :collapse-transition="false"
               class="session-menu"
-              v-infinite-scroll="loadMoreSessions"
-              :infinite-scroll-disabled="isLoading || noMore"
-              :infinite-scroll-distance="10"
+              :collapse="isCollapse"
           >
-            <!-- 无数据时显示空状态 -->
-            <el-empty v-if="sessionList.length === 0" description="暂无会话记录"></el-empty>
-            <!-- 会话列表项 -->
             <el-menu-item
                 v-for="session in sessionList"
                 :key="session.id"
-                :index="session.id.toString()"
+                :index="String(session.id)"
                 @click="selectSession(session)"
             >
-              <div class="session-item">
-                <span class="session-title">{{ session.title }}</span>
-              </div>
+              <el-icon><ChatDotRound /></el-icon>
+              <template #title>
+                <div class="session-item-content">
+                <span class="session-title" :title="session.title">
+                  {{ session.title }}
+                </span>
+                  <el-dropdown
+                      trigger="click"
+                      @click.stop
+                      v-if="!isCollapse"
+                  >
+                    <el-button
+                        type="primary"
+                        link
+                        class="session-more-btn"
+                        @click.stop
+                    >
+                      <el-icon><MoreFilled /></el-icon>
+                    </el-button>
+                    <template #dropdown>
+                      <el-dropdown-menu>
+                        <el-dropdown-item @click="startEditTitle(session, $event)">
+                          <el-icon><Edit /></el-icon>
+                          编辑标题
+                        </el-dropdown-item>
+                      </el-dropdown-menu>
+                    </template>
+                  </el-dropdown>
+                </div>
+              </template>
             </el-menu-item>
-            <!-- 加载中状态指示器 -->
-            <div v-if="isLoading" class="loading-more">
-              <el-icon class="is-loading"><loading /></el-icon>
-              <span>加载中...</span>
-            </div>
           </el-menu>
         </div>
       </el-aside>
+
+      <!-- 标题编辑对话框 -->
+      <el-dialog
+          v-model="editingSession"
+          title="编辑会话标题"
+          width="400px"
+          :show-close="true"
+          :close-on-click-modal="false"
+      >
+        <el-input
+            v-model="editingTitle"
+            placeholder="请输入新的会话标题"
+            maxlength="50"
+            show-word-limit
+        />
+        <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="editingSession = null">取消</el-button>
+          <el-button
+              type="primary"
+              @click="handleUpdateSessionTitle(editingSession)"
+          >
+            确认
+          </el-button>
+        </span>
+        </template>
+      </el-dialog>
 
       <el-main class="main">
         <!-- 无选中会话时显示默认问诊输入框 -->
@@ -238,11 +285,11 @@
 
 <script setup>
 import {ref, reactive, onMounted, nextTick} from 'vue'
-import { Loading, Plus } from '@element-plus/icons-vue'
+import {ChatDotRound, Edit, Loading, MoreFilled, Plus} from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getUserSessions, getSessionDetail } from '@/api/user'
+import { getUserSessions, getSessionDetail, updateSession } from '@/api/user'
 import { createQA } from '@/api/qa'
 
 const router = useRouter()
@@ -279,14 +326,15 @@ const pageSize = ref(10)              // 每页数量改回10
 const isCollapse = ref(false)         // 侧边栏是否折叠
 const isLoading = ref(false)          // 是否正在加载数据
 const noMore = ref(false)             // 是否还有更多数据
-const sessionMenuRef = ref(null)      // 会话菜单的引用
-const sessionContainerRef = ref(null) // 会话容器的引用
 const currentSession = ref(null)      // 当前选中的会话
 const qaList = ref([])                // 问答列表
 const loadingQA = ref(false)          // 加载问答列表状态
 const consultationQuery = ref('')     // 首页问诊输入
 const questionInput = ref('')         // 会话内问题输入
 const sending = ref(false)            // 发送状态
+
+const editingSession = ref(null) // 当前正在编辑的会话
+const editingTitle = ref('') // 编辑中的标题
 
 // 表单验证规则
 const profileRules = {
@@ -522,16 +570,6 @@ const fetchSessionList = async () => {
 }
 
 /**
- * 加载更多会话的处理函数
- * 当列表滚动到底部时触发
- */
-const loadMoreSessions = () => {
-  if (!isLoading.value && !noMore.value) {
-    fetchSessionList()
-  }
-}
-
-/**
  * 获取会话详情（问答列表）
  * @param {Object} session 会话对象
  */
@@ -578,7 +616,7 @@ const handleNewChat = () => {
 
 /**
  * 更新会话列表
- * @param {Object} newSession - 新的会话对象
+ * @param {Object} newSession - 新会话对象
  */
 const updateSessionList = (newSession) => {
   // 检查会话是否已存在
@@ -628,7 +666,7 @@ const handleSendQuestion = async () => {
         updateSessionList(newSession)
 
         // 切换到新会话
-        selectSession(newSession)
+        await selectSession(newSession)
 
         // 清空首页输入框
         consultationQuery.value = ''
@@ -637,7 +675,7 @@ const handleSendQuestion = async () => {
         qaList.value.push(newQA)
 
         // 滚动到最新消息
-        nextTick(() => {
+        await nextTick(() => {
           const qaListEl = document.querySelector('.qa-list')
           if (qaListEl) {
             qaListEl.scrollTop = qaListEl.scrollHeight
@@ -686,7 +724,7 @@ const handleSendQuestionInSession = async () => {
       // 添加到问答列表
       qaList.value.push(response.data)
       // 滚动到最新消息
-      nextTick(() => {
+      await nextTick(() => {
         const qaListEl = document.querySelector('.qa-list')
         if (qaListEl) {
           qaListEl.scrollTop = qaListEl.scrollHeight
@@ -720,24 +758,129 @@ onMounted(async () => {
     console.error('初始化失败', error)
   }
 })
+
+/**
+ * 处理会话标题更新
+ */
+const handleUpdateSessionTitle = async (session) => {
+  if (!editingTitle.value.trim()) {
+    ElMessage.warning('标题不能为空')
+    return
+  }
+
+  try {
+    const response = await updateSession({
+      id: session.id,
+      title: editingTitle.value.trim()
+    })
+
+    if (response.code === 0 && response.data) {
+      // 更新本地会话列表
+      const index = sessionList.value.findIndex(s => s.id === session.id)
+      if (index !== -1) {
+        sessionList.value[index] = {
+          ...session,
+          title: editingTitle.value.trim(),
+          updateTime: new Date().toISOString()
+        }
+      }
+
+      // 如果是当前选中的会话，也要更新currentSession
+      if (currentSession.value?.id === session.id) {
+        currentSession.value = {
+          ...currentSession.value,
+          title: editingTitle.value.trim()
+        }
+      }
+
+      ElMessage.success('标题已更新')
+      editingSession.value = null // 关闭编辑状态
+    } else {
+      ElMessage.error(response.msg || '更新失败')
+    }
+  } catch (error) {
+    console.error('更新会话标题失败:', error)
+    ElMessage.error('更新失败')
+  }
+}
+
+/**
+ * 打开编辑标题
+ */
+const startEditTitle = (session, event) => {
+  event.stopPropagation() // 阻止事件冒泡，防止触发选中会话
+  editingSession.value = session
+  editingTitle.value = session.title
+}
 </script>
 
 <style>
-/* 基础容器样式 */
+/* 布局容器样式 */
 .home-container {
   height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+}
+
+/* 头部样式 */
+.header {
+  height: 60px;
+  background-color: #fff;
+  border-bottom: 1px solid #e6e6e6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  flex-shrink: 0;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  padding: 0 8px;
+  height: 40px;
+  border-radius: 4px;
+  transition: all 0.3s;
+
+  &:hover {
+    background-color: #f5f7fa;
+  }
+}
+
+.user-avatar {
+  background-color: #409eff;
+  color: #fff;
+  font-weight: bold;
+}
+
+.username {
+  margin: 0 8px;
+  font-size: 14px;
+  color: #333;
 }
 
 /* 主容器样式 */
 .main-container {
   flex: 1;
+  display: flex;
   overflow: hidden;
 }
 
 /* 侧边栏样式 */
 .sidebar {
+  height: 100%;
   background-color: #fff;
   border-right: 1px solid #e6e6e6;
   transition: width 0.3s;
@@ -752,9 +895,39 @@ onMounted(async () => {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px;
+    padding: 12px 16px;
     border-bottom: 1px solid #e6e6e6;
-    font-weight: bold;
+    font-weight: 500;
+    font-size: 16px;
+    color: #333;
+
+    span {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      margin-right: 8px;
+    }
+
+    .collapse-btn {
+      height: 32px;
+      width: 32px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      transition: all 0.3s;
+
+      &:hover {
+        background-color: #f0f2f5;
+      }
+
+      .el-icon {
+        font-size: 18px;
+        transition: transform 0.3s;
+      }
+    }
   }
 
   .session-container {
@@ -777,56 +950,122 @@ onMounted(async () => {
 
   .session-menu {
     border-right: none;
-
-    .session-item {
-      padding: 0 10px;
-
-      .session-title {
-        display: block;
-        width: 100%;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        font-size: 14px;
-        color: #333;
-      }
-    }
   }
+}
+
+/* 会话项内容布局 */
+.session-item-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding-right: 8px;
+}
+
+/* 会话标题样式 */
+.session-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  color: #333;
+  margin-right: 8px;
+}
+
+/* 更多按钮样式 */
+.session-more-btn {
+  padding: 4px 8px;
+  font-size: 16px;
+  opacity: 0;
+  transition: all 0.2s ease;
+  border-radius: 4px;
+  color: #606266;
+  margin-left: 4px;
+
+  &:hover {
+    background-color: #f0f0f0;
+    color: #409eff;
+  }
+
+  .el-icon {
+    vertical-align: middle;
+  }
+}
+
+/* 在会话项hover时显示更多按钮 */
+.el-menu-item:hover .session-more-btn {
+  opacity: 1;
 }
 
 /* 主区域样式 */
 .main {
-  padding: 0;
-  height: 100%;
+  flex: 1;
   overflow: hidden;
-  display: flex;
   background-color: #f5f7fa;
+  padding: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
 /* 问诊中心样式 */
 .consultation-center {
-  flex: 1;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  padding: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
-  background-color: #f5f7fa;
 
   .consultation-card {
     width: 800px;
-    max-width: 100%;
+    max-width: calc(100% - 40px);
+    margin: 0 auto;
 
+    .el-card__body {
+      padding: 24px;
+    }
+  }
+
+  .consultation-input {
+    .el-textarea__inner {
+      resize: none;
+      border-radius: 4px;
+      padding: 12px;
+      font-size: 14px;
+      line-height: 1.6;
+      min-height: 150px !important;
+
+      &:focus {
+        box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.1);
+      }
+    }
   }
 
   .consultation-footer {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-top: 12px;
+    margin-top: 16px;
+    padding: 0 4px;
 
     .input-tip {
       color: #909399;
-      font-size: 12px;
+      font-size: 13px;
+      background-color: #f5f7fa;
+      padding: 4px 12px;
+      border-radius: 4px;
+    }
+
+    .el-button {
+      min-width: 96px;
+      height: 40px;
+      font-size: 14px;
+      font-weight: 500;
     }
   }
 }
@@ -854,6 +1093,64 @@ onMounted(async () => {
     font-size: 18px;
     font-weight: bold;
     color: #333;
+    max-width: 70%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .el-button {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 16px;
+    font-weight: 500;
+
+    .el-icon {
+      font-size: 16px;
+    }
+
+    &:hover {
+      background-color: #ecf5ff;
+    }
+  }
+}
+
+/* 主要按钮样式 */
+.el-button--primary {
+  &:not(.is-link) {
+    min-width: 88px;
+    font-weight: 500;
+    padding: 8px 20px;
+    height: 36px;
+    box-shadow: 0 2px 4px rgba(64, 158, 255, 0.1);
+
+    &:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(64, 158, 255, 0.2);
+    }
+
+    &:active {
+      transform: translateY(0);
+    }
+  }
+
+  &.is-link {
+    font-weight: 500;
+
+    &:hover {
+      background-color: #ecf5ff;
+      color: #409eff;
+    }
+  }
+
+  &.is-loading {
+    background-color: #409eff;
+    opacity: 0.9;
+
+    &::before {
+      background-color: rgba(255, 255, 255, 0.35);
+    }
   }
 }
 
@@ -920,7 +1217,6 @@ onMounted(async () => {
     }
   }
 
-  /* 右侧消息样式（问题） */
   &.right {
     justify-content: flex-end;
 
@@ -931,7 +1227,7 @@ onMounted(async () => {
       align-items: flex-end;
 
       .bubble {
-        background-color: #95d475;
+        background-color: #409eff;
         color: #fff;
         border-top-right-radius: 4px;
       }
@@ -942,7 +1238,6 @@ onMounted(async () => {
     }
   }
 
-  /* 左侧消息样式（回答） */
   &.left {
     justify-content: flex-start;
 
@@ -970,17 +1265,134 @@ onMounted(async () => {
 .qa-input-wrapper {
   max-width: 800px;
   margin: 0 auto;
+
+  .el-textarea__inner {
+    resize: none;
+    border-radius: 4px;
+    padding: 12px;
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100px !important;
+
+    &:focus {
+      box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.1);
+    }
+  }
 }
 
 .qa-input-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 12px;
+  margin-top: 16px;
+  padding: 0 4px;
 
   .qa-input-tip {
     color: #909399;
-    font-size: 12px;
+    font-size: 13px;
+    background-color: #f5f7fa;
+    padding: 4px 12px;
+    border-radius: 4px;
+  }
+
+  .el-button {
+    min-width: 96px;
+    height: 40px;
+    font-size: 14px;
+    font-weight: 500;
+  }
+}
+
+/* 下拉菜单样式优化 */
+.el-dropdown-menu {
+  padding: 4px 0;
+
+  .el-dropdown-menu__item {
+    display: flex;
+    align-items: center;
+    padding: 8px 16px;
+    font-size: 14px;
+
+    .el-icon {
+      margin-right: 8px;
+      font-size: 16px;
+    }
+
+    &:hover {
+      background-color: #ecf5ff;
+      color: #409eff;
+    }
+
+    &.danger {
+      color: #f56c6c;
+
+      &:hover {
+        background-color: #fef0f0;
+        color: #f56c6c;
+      }
+    }
+  }
+}
+
+/* 对话框样式 */
+.el-dialog {
+  border-radius: 8px;
+
+  .el-dialog__header {
+    margin: 0;
+    padding: 20px 24px;
+    border-bottom: 1px solid #e6e6e6;
+
+    .el-dialog__title {
+      font-size: 16px;
+      font-weight: 500;
+    }
+  }
+
+  .el-dialog__body {
+    padding: 24px;
+  }
+
+  .dialog-footer {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 24px;
+
+    .el-button {
+      min-width: 88px;
+      padding: 8px 20px;
+      height: 36px;
+      font-weight: 500;
+
+      & + .el-button {
+        margin-left: 16px;
+      }
+
+      &--default {
+        border-color: #dcdfe6;
+
+        &:hover {
+          border-color: #c0c4cc;
+          background-color: #f5f7fa;
+        }
+      }
+    }
+  }
+}
+
+/* 菜单项状态样式 */
+.el-menu-item {
+  &.is-active {
+    background-color: #ecf5ff;
+
+    .session-title {
+      color: #409eff;
+      font-weight: 500;
+    }
+  }
+
+  &:hover {
+    background-color: #f5f7fa;
   }
 }
 
@@ -992,6 +1404,12 @@ onMounted(async () => {
   justify-content: center;
   height: 100%;
   color: #909399;
+  font-size: 14px;
+
+  .el-icon {
+    margin-right: 8px;
+    font-size: 20px;
+  }
 }
 
 /* 全局滚动条样式 */
@@ -1011,16 +1429,32 @@ onMounted(async () => {
 
 /* 移动端适配 */
 @media screen and (max-width: 768px) {
-  .consultation-center .consultation-card {
-    margin: 0 16px;
+  .header {
+    padding: 0 16px;
+  }
+
+  .consultation-center {
+    padding: 16px;
+
+    .consultation-card {
+      max-width: calc(100% - 32px);
+    }
   }
 
   .qa-input-container {
     padding: 12px 16px;
   }
 
+  .qa-input-wrapper .el-textarea__inner {
+    min-height: 80px !important;
+  }
+
   .message-item .content {
     max-width: 85%;
+  }
+
+  .user-info .username {
+    display: none;
   }
 }
 </style>
