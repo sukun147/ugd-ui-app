@@ -127,3 +127,16 @@ export function updateSession(data) {
         data
     })
 }
+
+/**
+ * 删除会话
+ * @param {Number} sessionId - 会话编号
+ * @returns {Promise}
+ */
+export function deleteSession(sessionId) {
+    return request({
+        url: '/app-api/tcmc/client-user/session/delete',
+        method: 'get',
+        params: { sessionId }
+    })
+}

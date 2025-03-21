@@ -71,6 +71,10 @@
                           <el-icon><Edit /></el-icon>
                           编辑标题
                         </el-dropdown-item>
+                        <el-dropdown-item @click="handleDeleteSession(session)">
+                          <el-icon><Delete /></el-icon>
+                          删除会话
+                        </el-dropdown-item>
                       </el-dropdown-menu>
                     </template>
                   </el-dropdown>
@@ -285,10 +289,10 @@
 
 <script setup>
 import {ref, reactive, onMounted, nextTick} from 'vue'
-import {ChatDotRound, Edit, Loading, MoreFilled, Plus} from '@element-plus/icons-vue'
+import {ChatDotRound, Delete, Edit, Loading, MoreFilled, Plus} from '@element-plus/icons-vue'
 import { useUserStore } from '@/store/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getUserSessions, getSessionDetail, getUserSession, updateSession } from '@/api/user'
+import {getUserSessions, getSessionDetail, getUserSession, updateSession, deleteSession} from '@/api/user'
 import { createQA } from '@/api/qa'
 
 const userStore = useUserStore()
@@ -790,6 +794,44 @@ const startEditTitle = (session, event) => {
   event.stopPropagation() // 阻止事件冒泡，防止触发选中会话
   editingSession.value = session
   editingTitle.value = session.title
+}
+
+// 处理删除会话的方法
+const handleDeleteSession = async (session) => {
+  try {
+    // 显示删除确认对话框
+    await ElMessageBox.confirm('确定要删除此会话吗？', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+
+    // 调用删除会话的API
+    const response = await deleteSession(session.id)
+
+    // 处理API响应
+    if (response.code === 0 && response.data === true) {
+      // 删除成功，显示成功提示
+      ElMessage.success('会话删除成功')
+      // 从会话列表中移除被删除的会话
+      sessionList.value = sessionList.value.filter(item => item.id !== session.id)
+      // 如果删除的是当前选中的会话，清除当前会话
+      if (currentSession.value?.id === session.id) {
+        currentSession.value = null
+      }
+    } else {
+      // 删除失败，显示错误信息
+      ElMessage.error(response.msg || '删除失败')
+    }
+  } catch (error) {
+    // 如果用户取消删除操作，直接返回
+    if (error === 'cancel') {
+      return
+    }
+    // 处理其他错误情况
+    console.error('删除会话失败:', error)
+    ElMessage.error('删除会话失败')
+  }
 }
 </script>
 
