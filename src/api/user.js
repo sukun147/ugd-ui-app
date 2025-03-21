@@ -14,6 +14,21 @@ export function login(data) {
 }
 
 /**
+ * 刷新访问令牌
+ * @param {string} refreshToken - 刷新令牌
+ * @returns {Promise}
+ */
+export function refreshToken(refreshToken) {
+    return request({
+        url: '/app-api/system/auth/refresh-token',
+        method: 'post',
+        params: {
+            refreshToken
+        }
+    })
+}
+
+/**
  * 用户注册
  * @param {Object} data
  * @returns {Promise}

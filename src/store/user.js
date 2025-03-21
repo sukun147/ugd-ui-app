@@ -18,7 +18,7 @@ export const useUserStore = defineStore('user', {
     },
 
     actions: {
-        // 用户登录
+        // 确保 login action 中正确保存了 refreshToken
         async login(userInfo) {
             try {
                 const { username, password } = userInfo
@@ -27,16 +27,16 @@ export const useUserStore = defineStore('user', {
 
                 // 保存到 store
                 this.userId = userId
-                this.username = username // 保存用户名
+                this.username = username
                 this.accessToken = accessToken
-                this.refreshToken = refreshToken
+                this.refreshToken = refreshToken  // 确保保存刷新令牌
                 this.expiresTime = expiresTime
 
                 // 保存到 localStorage
                 localStorage.setItem('userId', userId)
-                localStorage.setItem('username', username) // 保存用户名到 localStorage
+                localStorage.setItem('username', username)
                 localStorage.setItem('accessToken', accessToken)
-                localStorage.setItem('refreshToken', refreshToken)
+                localStorage.setItem('refreshToken', refreshToken)  // 确保保存刷新令牌
 
                 // 登录成功后获取用户详细信息
                 await this.getUserInfo()
